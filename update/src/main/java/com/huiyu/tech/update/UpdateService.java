@@ -13,7 +13,6 @@ import android.os.Environment;
 import android.os.IBinder;
 import android.provider.Settings;
 import android.support.v4.content.FileProvider;
-import android.text.TextUtils;
 import android.util.Log;
 import android.webkit.MimeTypeMap;
 import android.widget.Toast;
@@ -66,8 +65,7 @@ public class UpdateService extends Service {
         if (id > 0) {
             int status = getDownloadStatus(id);
             if (status == DownloadManager.STATUS_SUCCESSFUL) {
-                download = false;
-                installApp(id);
+                download = !installApp(id);
             } else if (status == DownloadManager.STATUS_PENDING
                     || status == DownloadManager.STATUS_RUNNING) {
                 download = false;
@@ -167,8 +165,8 @@ public class UpdateService extends Service {
                     }
                 }
             }
-            if (install) {
-                installApp(downloadId);
+            if (install && installApp(downloadId)) {
+                stopSelf();
             }
         }
     }
@@ -177,10 +175,11 @@ public class UpdateService extends Service {
         Toast.makeText(context, text, Toast.LENGTH_SHORT).show();
     }
 
-    private void installApp(long downId) {
+    private boolean installApp(long downId) {
+        boolean ret = false;
         Context context = getApplicationContext();
         File apkFile = queryFile(downId);
-        if (apkFile != null) {
+        if (apkFile != null && apkFile.exists()) {
             if (canInstall(context)) {
                 Intent intent = new Intent(Intent.ACTION_VIEW);
                 Uri uri;
@@ -193,18 +192,18 @@ public class UpdateService extends Service {
                 intent.setDataAndType(uri, "application/vnd.android.package-archive");
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                 context.startActivity(intent);
-            } else {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    showToast(context, "请允许未知来源安装");
-                    Intent intent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
-                    intent.setData(Uri.fromParts("package", getPackageName(), null));
-                    startActivity(intent);
-                }
+                ret = true;
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                showToast(context, "请允许未知来源安装");
+                Intent intent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
+                intent.setData(Uri.fromParts("package", getPackageName(), null));
+                startActivity(intent);
+                ret = true;
             }
         } else {
             showToast(context, "安装失败");
         }
-        this.stopSelf();
+        return ret;
     }
 
     private boolean canInstall(Context context) {
@@ -220,9 +219,14 @@ public class UpdateService extends Service {
         Cursor cur = manager.query(query);
         if (cur != null) {
             if (cur.moveToFirst()) {
-                String uriString = cur.getString(cur.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI));
-                if (!TextUtils.isEmpty(uriString)) {
-                    apk = new File(Uri.parse(uriString).getPath());
+                String localUri = cur.getString(cur.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI));
+                try {
+                    Uri uri = Uri.parse(localUri);
+                    if (uri != null && uri.getPath() != null) {
+                        apk = new File(uri.getPath());
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
                 }
             }
             cur.close();
