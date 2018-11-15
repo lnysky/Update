@@ -165,8 +165,12 @@ public class UpdateService extends Service {
                     }
                 }
             }
-            if (install && installApp(downloadId)) {
-                stopSelf();
+            if (install) {
+                if (installApp(downloadId)) {
+                    stopSelf();
+                } else {
+                    showToast(context, "安装失败");
+                }
             }
         }
     }
@@ -200,8 +204,6 @@ public class UpdateService extends Service {
                 startActivity(intent);
                 ret = true;
             }
-        } else {
-            showToast(context, "安装失败");
         }
         return ret;
     }
