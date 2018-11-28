@@ -12,12 +12,12 @@ ext {
             minSdkVersion    : 14,
             targetSdkVersion : 27,
 
-            versionCode      : 1,
-            versionName      : "1.0.0",
+            versionCode      : 5,
+            versionName      : "1.0.5",
     ]
     
     bintray = [
-            version       : "1.0.1", // 指定库的版本号
+            version       : "1.0.5", // 指定库的版本号
             group         : "com.huiyu.tech", // 库的group名，确定好之后不能修改
 
             siteUrl       : "https://github.com/lnysky/update.git", // 项目开源地址
@@ -36,7 +36,7 @@ ext {
 
             binrayLibrary : "update", // 项目在bintray上的名称
             bintrayRepo   : "maven", // 发布到自己在bintray的哪个仓库中，一般默认maven
-            bintrayUser   : "lnybrave", // bintray的用户名
+            bintrayUser   : "danyon", // bintray的用户名
             bintrayLicense: "Apache-2.0" // 指定bintray上的开源协议
     ]
 
