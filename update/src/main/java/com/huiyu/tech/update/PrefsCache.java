@@ -8,7 +8,7 @@ import android.content.SharedPreferences;
  */
 class PrefsCache implements Cache {
 
-    private SharedPreferences prefs;
+    private final SharedPreferences prefs;
 
     PrefsCache(Context context) {
         prefs = context.getSharedPreferences(context.getPackageName() + "_update", Context.MODE_PRIVATE);

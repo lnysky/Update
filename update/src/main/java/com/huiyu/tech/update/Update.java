@@ -58,9 +58,9 @@ public class Update {
 
     public static class Builder {
 
-        private Context mContext;
+        private final Context mContext;
+        private final UpdateConfig mConfig;
         private String mUrl;
-        private UpdateConfig mConfig;
         private Callback mCallback;
 
         Builder(Context context) {

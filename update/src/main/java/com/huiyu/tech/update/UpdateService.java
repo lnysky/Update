@@ -156,7 +156,6 @@ public class UpdateService extends Service {
                 long downId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
                 install = downloadId == downId && autoInstall;
             } else if (DownloadManager.ACTION_NOTIFICATION_CLICKED.equals(intent.getAction())) {
-                // 不会走到这里?文件类型未知会不会走呢?
                 long[] ids = intent.getLongArrayExtra(DownloadManager.EXTRA_NOTIFICATION_CLICK_DOWNLOAD_IDS);
                 for (long id : ids) {
                     if (id == downloadId) {
