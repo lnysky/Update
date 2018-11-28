@@ -1,3 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">update</string>
+    <string name="update_toast_open_wifi">please open wifi</string>
+    <string name="update_toast_install_fail">install fail</string>
+    <string name="update_toast_allow_install_from_unknown">allow install from unknown</string>
 </resources>

@@ -117,7 +117,7 @@ public class UpdateService extends Service {
         if (!config.mOnlyWifi) {
             networkTypes |= DownloadManager.Request.NETWORK_MOBILE;
         } else if (!UpdateUtils.isConnectedWifi(this)) {
-            showToast(this, "请打开WiFi");
+            showToast(this, getString(R.string.update_toast_open_wifi));
         }
         request.setAllowedNetworkTypes(networkTypes);
         if (config.mShowNotify && config.mAutoInstall) {
@@ -169,7 +169,7 @@ public class UpdateService extends Service {
                 if (installApp(downloadId)) {
                     stopSelf();
                 } else {
-                    showToast(context, "安装失败");
+                    showToast(context, getString(R.string.update_toast_install_fail));
                 }
             }
         }
@@ -198,7 +198,7 @@ public class UpdateService extends Service {
                 context.startActivity(intent);
                 ret = true;
             } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                showToast(context, "请允许未知来源安装");
+                showToast(context, getString(R.string.update_toast_allow_install_from_unknown));
                 Intent intent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
                 intent.setData(Uri.fromParts("package", getPackageName(), null));
                 startActivity(intent);
