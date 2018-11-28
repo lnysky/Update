@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="update_toast_open_wifi">请打开WiFi</string>
+    <string name="update_toast_install_fail">安装失败</string>
+    <string name="update_toast_allow_install_from_unknown">请允许未知来源安装</string>
+</resources>
