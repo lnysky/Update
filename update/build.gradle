@@ -9,7 +9,7 @@ android {
         targetSdkVersion rootProject.ext.android.targetSdkVersion
     }
 
-    resourcePrefix 'update'
+    resourcePrefix 'update_'
 }
 
 dependencies {
