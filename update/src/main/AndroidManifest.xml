@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.huiyu.tech.update">
+    package="com.lnysky.tech.update">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
@@ -11,11 +11,11 @@
     <application>
 
         <service
-            android:name="com.huiyu.tech.update.UpdateService"
+            android:name="com.lnysky.tech.update.UpdateService"
             android:exported="false" />
 
         <provider
-            android:name=".UpdateFileProvider"
+            android:name="com.lnysky.tech.update.UpdateFileProvider"
             android:authorities="${applicationId}.update.provider"
             android:exported="false"
             android:grantUriPermissions="true">
