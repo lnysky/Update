@@ -8,16 +8,16 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.database.Cursor;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Environment;
+import android.os.Handler;
 import android.os.IBinder;
-import android.provider.Settings;
-import android.support.v4.content.FileProvider;
 import android.util.Log;
 import android.webkit.MimeTypeMap;
 import android.widget.Toast;
 
 import java.io.File;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class UpdateService extends Service {
 
@@ -25,12 +25,17 @@ public class UpdateService extends Service {
 
     public static final String PARAM_UPDATE_URL = "update_url";
     public static final String PARAM_UPDATE_CONFIG = "update_config";
+    public static final String ACTION_UPDATE_PROGRESS = "com.lnysky.tech.update.progress";
+    public static final String ACTION_UPDATE_DOWNLOAD_COMPLETE = "com.lnysky.tech.update.download.complete";
+    public static final String EXTRA_UPDATE_PROGRESS = "update_progress";
+    public static final String EXTRA_UPDATE_APK_FILE_PATH = "update_apk_file_path";
 
     private long downloadId;
     private DownloadManager manager;
     private CompleteReceiver receiver;
     private Cache cache = null;
     private boolean autoInstall = false;
+    private boolean downloadComplete = false;
 
     private void ensureCache(Context context) {
         if (cache == null) {
@@ -65,20 +70,30 @@ public class UpdateService extends Service {
         if (id > 0) {
             int status = getDownloadStatus(id);
             if (status == DownloadManager.STATUS_SUCCESSFUL) {
-                download = !installApp(id);
-            } else if (status == DownloadManager.STATUS_PENDING
-                    || status == DownloadManager.STATUS_RUNNING) {
+                if (config.mUseCache) {
+                    download = !installApp(queryFile(downloadId), null);
+                } else {
+                    manager.remove(id);
+                }
+            } else if (status == DownloadManager.STATUS_RUNNING) {
                 download = false;
-            } else if (status == DownloadManager.STATUS_PAUSED
+                downloadId = id;
+            } else if (status == DownloadManager.STATUS_PENDING
+                    || status == DownloadManager.STATUS_PAUSED
                     || status == DownloadManager.STATUS_FAILED) {
+                manager.remove(id);
+            } else {
                 manager.remove(id);
             }
         }
+
+        autoInstall = config.mAutoInstall;
 
         if (download) {
             downloadId = download(url, config);
             setDownloadId(url, downloadId);
         }
+        onDownloadStart();
         return Service.START_NOT_STICKY;
     }
 
@@ -109,8 +124,6 @@ public class UpdateService extends Service {
     }
 
     private long download(String url, UpdateConfig config) {
-        autoInstall = config.mAutoInstall;
-
         DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
         request.setTitle(config.mTitle);
         int networkTypes = DownloadManager.Request.NETWORK_WIFI;
@@ -145,15 +158,23 @@ public class UpdateService extends Service {
         if (receiver != null) {
             unregisterReceiver(receiver);
         }
+        onDownloadStop();
+        if (!downloadComplete) {
+            manager.remove(downloadId);
+        }
         super.onDestroy();
     }
 
     class CompleteReceiver extends BroadcastReceiver {
         @Override
-        public void onReceive(Context context, Intent intent) {
+        public void onReceive(final Context context, Intent intent) {
             boolean install = false;
             if (DownloadManager.ACTION_DOWNLOAD_COMPLETE.equals(intent.getAction())) {
                 long downId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
+                if (downloadId == downId) {
+                    downloadComplete = true;
+                    onDownloadStop();
+                }
                 install = downloadId == downId && autoInstall;
             } else if (DownloadManager.ACTION_NOTIFICATION_CLICKED.equals(intent.getAction())) {
                 long[] ids = intent.getLongArrayExtra(DownloadManager.EXTRA_NOTIFICATION_CLICK_DOWNLOAD_IDS);
@@ -164,12 +185,25 @@ public class UpdateService extends Service {
                     }
                 }
             }
-            if (install) {
-                if (installApp(downloadId)) {
+            File apkFile = queryFile(downloadId);
+            notifyDownloadComplete(apkFile);
+            if (install && installApp(apkFile, new Install.Callback() {
+                @Override
+                public void onGranted(File file) {
+                    Log.i(TAG, "允许安装");
                     stopSelf();
-                } else {
-                    showToast(context, getString(R.string.update_toast_install_fail));
                 }
+
+                @Override
+                public void onDenied(File file) {
+                    Log.i(TAG, "不允许安装");
+                    stopSelf();
+                }
+            })) {
+                // do noting
+            } else {
+                showToast(context, getString(R.string.update_toast_install_fail));
+                stopSelf();
             }
         }
     }
@@ -178,38 +212,20 @@ public class UpdateService extends Service {
         Toast.makeText(context, text, Toast.LENGTH_SHORT).show();
     }
 
-    private boolean installApp(long downId) {
-        boolean ret = false;
+    private boolean installApp(File apkFile, Install.Callback callback) {
         Context context = getApplicationContext();
-        File apkFile = queryFile(downId);
         if (apkFile != null && apkFile.exists()) {
-            if (canInstall(context)) {
-                Intent intent = new Intent(Intent.ACTION_VIEW);
-                Uri uri;
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    uri = FileProvider.getUriForFile(context, UpdateFileProvider.getProviderName(context), apkFile);
-                    intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                } else {
-                    uri = Uri.fromFile(apkFile);
-                }
-                intent.setDataAndType(uri, "application/vnd.android.package-archive");
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                context.startActivity(intent);
-                ret = true;
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                showToast(context, getString(R.string.update_toast_allow_install_from_unknown));
-                Intent intent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES);
-                intent.setData(Uri.fromParts("package", getPackageName(), null));
-                startActivity(intent);
-                ret = true;
-            }
+            Install.install(context, apkFile, callback);
+            return true;
         }
-        return ret;
+        return false;
     }
 
-    private boolean canInstall(Context context) {
-        return Build.VERSION.SDK_INT < Build.VERSION_CODES.O
-                || context.getPackageManager().canRequestPackageInstalls();
+    private void notifyDownloadComplete(File apkFile) {
+        Log.d(TAG, "notifyDownloadComplete");
+        Intent intent = new Intent(ACTION_UPDATE_DOWNLOAD_COMPLETE);
+        intent.putExtra(UpdateService.EXTRA_UPDATE_APK_FILE_PATH, apkFile.getPath());
+        sendBroadcast(intent);
     }
 
     private File queryFile(long id) {
@@ -234,4 +250,79 @@ public class UpdateService extends Service {
         }
         return apk;
     }
+
+    private Handler downLoadHandler = new Handler();
+
+    private Timer timer;
+    private TimerTask timerTask = new TimerTask() {
+        @Override
+        public void run() {
+            updateProgress();
+        }
+    };
+
+    private void updateProgress() {
+        final int[] bytesAndStatus = getBytesAndStatus(downloadId);
+        downLoadHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                Log.d(TAG, "downloadId=" + downloadId + " so far = " + bytesAndStatus[0] + " total=" + bytesAndStatus[1] + " state=" + bytesAndStatus[2]);
+                if (bytesAndStatus[0] > 0
+                        && bytesAndStatus[1] > 0
+                        && bytesAndStatus[2] != DownloadManager.STATUS_SUCCESSFUL) {
+                    Intent intent = new Intent(ACTION_UPDATE_PROGRESS);
+                    intent.putExtra(UpdateService.EXTRA_UPDATE_PROGRESS, bytesAndStatus);
+                    sendBroadcast(intent);
+                }
+            }
+        });
+    }
+
+    private void onDownloadStart() {
+        Log.d(TAG, "onDownloadStart");
+        if (timer == null) {
+            timer = new Timer();
+        }
+        if (timerTask != null) {
+            timerTask.cancel();
+        }
+        timerTask = new TimerTask() {
+            @Override
+            public void run() {
+                updateProgress();
+            }
+        };
+        timer.schedule(timerTask, 0, 1000);
+    }
+
+    private void onDownloadStop() {
+        Log.d(TAG, "onDownloadStop");
+        if (timer != null) {
+            timer.cancel();
+            timer = null;
+        }
+    }
+
+    private int[] getBytesAndStatus(long downloadId) {
+        int[] bytesAndStatus = new int[]{-1, -1, 0};
+
+        DownloadManager.Query query = new DownloadManager.Query().setFilterById(downloadId);
+        Cursor cursor = null;
+
+        try {
+            cursor = manager.query(query);
+            if (cursor != null && cursor.moveToFirst()) {
+                bytesAndStatus[0] = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+                bytesAndStatus[1] = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+                bytesAndStatus[2] = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS));
+            }
+        } finally {
+            if (cursor != null) {
+                cursor.close();
+            }
+        }
+
+        return bytesAndStatus;
+    }
+
 }

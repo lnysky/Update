@@ -11,4 +11,5 @@ class UpdateConfig implements Serializable {
     boolean mShowNotify = false;
     boolean mAutoInstall = false;
     boolean mOnlyWifi = false;
+    boolean mUseCache = false;
 }

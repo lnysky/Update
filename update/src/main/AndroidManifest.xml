@@ -10,6 +10,13 @@
 
     <application>
 
+        <activity
+            android:name=".PermissionActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize"
+            android:launchMode="standard"
+            android:theme="@style/Update.Theme.Activity"
+            android:windowSoftInputMode="stateHidden|stateAlwaysHidden" />
+
         <service
             android:name="com.lnysky.tech.update.UpdateService"
             android:exported="false" />
